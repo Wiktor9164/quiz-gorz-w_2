@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+
+<html lang="pl">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Gorzów Quest: Neon Edition</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <style>
+
+        :root {
+
+            --neon-blue: #00f2ff;
+
+            --neon-green: #39ff14;
+
+            --neon-red: #ff0055;
+
+            --neon-gold: #fff200;
+
+            --bg: #030305;
+
+            --tile-grass: #0a400a;
+
+            --tile-path: #1a1a1a;
+
+            --tile-water: #0011ff;
+
+        }
+
+        * { box-sizing: border-box; touch-action: manipulation; }
+
+        body {
+
+            background: var(--bg); color: white; font-family: 'Press Start 2P', cursive;
+
+            margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center;
+
+        }
+
+
+
+        /* Menu Startowe */
+
+        #overlay {
+
+            position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1000;
+
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+
+            text-align: center; border: 8px solid #111;
+
+        }
+
+        .btn-menu {
+
+            background: #000; color: white; border: 4px double #444; padding: 15px;
+
+            margin: 10px; width: 280px; font-family: inherit; font-size: 10px; cursor: pointer;
+
+            transition: 0.2s;
+
+        }
+
+        .btn-menu:hover { border-color: var(--neon-blue); color: var(--neon-blue); }
+
+        .hard { border-color: #500; color: #f66; }
+
+
+
+        /* Silnik Gry */
+
+        #game-box { position: relative; margin-top: 5px; border: 4px solid #333; box-shadow: 0 0 25px rgba(0,0,0,1); }
+
+        canvas { display: block; image-rendering: pixelated; max-width: 95vw; max-height: 65vh; }
+
+
+
+        /* UI Quizu */
+
+        .dialog {
+
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+
+            background: rgba(0,0,0,0.95); border: 4px double var(--neon-blue); padding: 25px;
+
+            width: 90%; display: none; text-align: center; z-index: 50;
+
+            box-shadow: 0 0 30px rgba(0,0,0,1);
+
+        }
+
+        #q-title { color: var(--neon-gold); font-size: 14px; margin: 0 0 15px 0; text-shadow: 0 0 10px var(--neon-gold); }
+
+        #q-desc { font-size: 9px; line-height: 1.6; color: #fff; margin-bottom: 20px; }
+
+       
+
+        input {
+
+            background: #111; color: var(--neon-green); border: 2px solid #444;
+
+            padding: 12px; width: 100%; font-family: inherit; font-size: 10px;
+
+            margin-bottom: 20px; outline: none; text-align: center;
+
+        }
+
+        input:focus { border-color: var(--neon-green); }
+
+
+
+        /* Sterowanie Mobilne */
+
+        .controls { display: grid; grid-template-columns: repeat(3, 75px); gap: 10px; margin: 15px; }
+
+        .ctrl-btn {
+
+            width: 75px; height: 75px; background: #151515; border: 2px solid #333;
+
+            color: white; border-radius: 12px; font-size: 24px; display: flex;
+
+            align-items: center; justify-content: center; cursor: pointer; user-select: none;
+
+        }
+
+        .ctrl-btn:active { background: var(--neon-blue); color: #000; transform: scale(0.9); }
+
+
+
+        #hud { font-size: 8px; margin: 10px; color: var(--neon-blue); line-height: 1.5; text-align: center;}
+
+    </style>
+
+</head>
+
+<body>
+
+
+
+    <div id="overlay">
+
+        <h1 style="color:var(--neon-blue); font-size:22px; text-shadow: 0 0 15px var(--neon-blue);">GORZÓW QUEST</h1>
+
+        <p style="font-size:8px; color:#aaa; margin-bottom:20px;">ODKRYJ TAJEMNICE MIASTA</p>
+
+        <button class="btn-menu" onclick="initGame('easy')">TRYB PRZECIĘTNY</button>
+
+        <button class="btn-menu hard" onclick="initGame('hard')">TRYB TRUDNY</button>
+
+    </div>
+
+
+
+    <div id="hud">
+
+        PROGRES: <span id="score" style="color:var(--neon-gold)">0</span>/10<br>
+
+        TRYB: <span id="mode-text" style="color:var(--neon-green)">-</span>
+
+    </div>
+
+
+
+    <div id="game-box">
+
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <div id="quiz-box" class="dialog">
+
+            <h2 id="q-title">KATEGORIA</h2>
+
+            <p id="q-desc">Pytanie pojawi się tutaj...</p>
+
+            <input type="text" id="ans-input" placeholder="TWOJA ODPOWIEDŹ..." autocomplete="off">
+
+            <button class="btn-menu" style="width:100%; border-color:var(--neon-green); color:var(--neon-green);" onclick="verifyAns()">ZATWIERDŹ</button>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="controls">
+
+        <div></div><div class="ctrl-btn" onmousedown="move(0,-1)" ontouchstart="move(0,-1)">↑</div><div></div>
+
+        <div class="ctrl-btn" onmousedown="move(-1,0)" ontouchstart="move(-1,0)">←</div>
+
+        <div class="ctrl-btn" onmousedown="move(0,1)" ontouchstart="move(0,1)">↓</div>
+
+        <div class="ctrl-btn" onmousedown="move(1,0)" ontouchstart="move(1,0)">→</div>
+
+    </div>
+
+
+
+<script>
+
+    const canvas = document.getElementById('gameCanvas');
+
+    const ctx = canvas.getContext('2d');
+
+    const TILE = 20;
+
+    let isPlaying = false;
+
+    let difficulty = 'easy';
+
+    let player = { x: 1, y: 1 };
+
+    let particles = [];
+
+
+
+    // Pobieranie kolorów z CSS, aby rysowanie było zgodne z motywem
+
+    const getColors = () => ({
+
+        grass: getComputedStyle(document.documentElement).getPropertyValue('--tile-grass').trim(),
+
+        path: getComputedStyle(document.documentElement).getPropertyValue('--tile-path').trim(),
+
+        water: getComputedStyle(document.documentElement).getPropertyValue('--tile-water').trim(),
+
+        exit: getComputedStyle(document.documentElement).getPropertyValue('--neon-red').trim(),
+
+        gold: getComputedStyle(document.documentElement).getPropertyValue('--neon-gold').trim(),
+
+        neon: varNeon()
+
+    });
+
+
+
+    const map = [
+
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,1,3,0,1,1,1,3,1,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+
+        [2,2,2,2,2,2,2,1,1,2,2,2,2,2,2,2,2,2,2,2], // Rzeka
+
+        [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,3,1,1,1,1,1,1,0,0,1,1,1,3,1,1,1,1,1,0],
+
+        [0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0],
+
+        [0,1,1,3,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,0],
+
+        [0,0,0,0,0,0,0,0,0,0,1,0,0,1,1,1,3,1,1,0],
+
+        [0,1,1,1,1,1,1,1,1,1,1,0,0,1,0,0,0,0,0,0],
+
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],
+
+        [0,1,1,1,1,3,1,1,1,1,1,3,1,1,0,0,0,0,0,0],
+
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],
+
+        [0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,1,3,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,4,0],
+
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+
+        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
+    ];
+
+
+
+    const quests = [
+
+        { x: 2, y: 3, cat: "HISTORIA", q: "Jak nazywało się miasto przed 1945 rokiem?", a: "landsberg", s: false },
+
+        { x: 7, y: 3, cat: "HISTORIA", q: "W którym roku Gorzów otrzymał prawa miejskie?", a: "1257", s: false },
+
+        { x: 1, y: 7, cat: "ZABYTKI", q: "Jak nazywa się najstarszy budynek w centrum?", a: "katedra", s: false },
+
+        { x: 13, y: 7, cat: "ZABYTKI", q: "Dawny budynek nad rzeką, w którym jest muzeum?", a: "spichlerz", s: false },
+
+        { x: 3, y: 9, cat: "ŻUŻEL", q: "Podaj nazwisko patrona stadionu (Edward...)?", a: "jancarz", s: false },
+
+        { x: 16, y: 10, cat: "ŻUŻEL", q: "Ile razy Stal Gorzów była Mistrzem Polski (do 2023)?", a: "9", s: false },
+
+        {x: 8, y: 4, cat: "KULTURA", q: "Imię poetki romskiej z Gorzowa?", a: "papusza", d: false},
+
+        { x: 11, y: 13, cat: "KULTURA", q: "Nazwisko słynnego artysty-kloszarda (Szymon...)?", a: "gięty", s: false },
+
+        { x: 2, y: 17, cat: "CIEKAWOSTKI", q: "Kultowy gorzowski fastfood (bułka z...)?", a: "pieczarkami", s: false },
+
+        { x: 8, y: 17, cat: "CIEKAWOSTKI", q: "Ile wzgórz otacza Gorzów (według legendy)?", a: "7", s: false }
+
+    ];
+
+
+
+    function initGame(m) {
+
+        difficulty = m;
+
+        document.getElementById('overlay').style.display = 'none';
+
+        document.getElementById('mode-text').innerText = m === 'easy' ? 'PRZECIĘTNY' : 'TRUDNY';
+
+        isPlaying = true;
+
+        gameLoop();
+
+    }
+
+
+
+    function draw() {
+
+        const colors = getColors();
+
+        ctx.clearRect(0,0,400,400);
+
+       
+
+        for(let y=0; y<20; y++){
+
+            for(let x=0; x<20; x++){
+
+                let t = map[y][x];
+
+                if(t === 0) ctx.fillStyle = colors.grass;
+
+                else if(t === 1) ctx.fillStyle = colors.path;
+
+                else if(t === 2) ctx.fillStyle = colors.water;
+
+                else if(t === 3) ctx.fillStyle = "#221100";
+
+                else if(t === 4) ctx.fillStyle = colors.exit;
+
+                ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+
+               
+
+                if(t === 4) {
+
+                    ctx.fillStyle = "white";
+
+                    ctx.font = "6px 'Press Start 2P'";
+
+                    ctx.fillText("EXIT", x*TILE+1, y*TILE+12);
+
+                }
+
+            }
+
+        }
+
+
+
+        quests.forEach(q => {
+
+            if(!q.s) {
+
+                ctx.fillStyle = (Date.now() % 600 < 300) ? colors.gold : "#fff";
+
+                ctx.shadowBlur = 5; ctx.shadowColor = colors.gold;
+
+                ctx.fillRect(q.x*TILE+6, q.y*TILE+6, 8, 8);
+
+                ctx.shadowBlur = 0;
+
+            }
+
+        });
+
+
+
+        // Gracz
+
+        ctx.fillStyle = colors.neon;
+
+        ctx.shadowBlur = 15; ctx.shadowColor = colors.neon;
+
+        ctx.fillRect(player.x*TILE+4, player.y*TILE+4, 12, 12);
+
+        ctx.strokeStyle = "white"; ctx.strokeRect(player.x*TILE+4, player.y*TILE+4, 12, 12);
+
+        ctx.shadowBlur = 0;
+
+
+
+        // Efekt Konfetti na koniec
+
+        particles.forEach((p, i) => {
+
+            p.y += p.v; p.x += Math.sin(p.y/10);
+
+            ctx.fillStyle = p.c;
+
+            ctx.fillRect(p.x, p.y, 4, 4);
+
+            if(p.y > 400) particles.splice(i, 1);
+
+        });
+
+    }
+
+
+
+    function varNeon() { return difficulty === 'easy' ? "#00ffcc" : "#ff00ff"; }
+
+
+
+    function move(dx, dy) {
+
+        if(!isPlaying || document.getElementById('quiz-box').style.display === 'block') return;
+
+        let nx = player.x + dx, ny = player.y + dy;
+
+        if(nx >= 0 && nx < 20 && ny >= 0 && ny < 20) {
+
+            if(map[ny][nx] !== 0 && map[ny][nx] !== 2) {
+
+                player.x = nx; player.y = ny;
+
+                checkTile();
+
+            }
+
+        }
+
+    }
+
+
+
+    function checkTile() {
+
+        if(map[player.y][player.x] === 4) {
+
+            if(quests.every(q => q.s)) endBattle();
+
+            else alert("ZBIERZ WSZYSTKIE PUNKTY WIEDZY!");
+
+        }
+
+        let q = quests.find(i => i.x === player.x && i.y === player.y && !i.s);
+
+        if(q) {
+
+            document.getElementById('q-title').innerText = q.cat;
+
+            document.getElementById('q-desc').innerText = q.q;
+
+            document.getElementById('quiz-box').style.display = 'block';
+
+            document.getElementById('ans-input').focus();
+
+        }
+
+    }
+
+
+
+    function verifyAns() {
+
+        let val = document.getElementById('ans-input').value.toLowerCase();
+
+        let q = quests.find(i => i.x === player.x && i.y === player.y);
+
+       
+
+        if(val.includes(q.a)) {
+
+            q.s = true;
+
+            document.getElementById('quiz-box').style.display = 'none';
+
+            document.getElementById('ans-input').value = "";
+
+            document.getElementById('score').innerText = quests.filter(i => i.s).length;
+
+            beep(440, 0.1);
+
+        } else {
+
+            beep(110, 0.3);
+
+            if(difficulty === 'hard') {
+
+                player = {x:1, y:1};
+
+                document.getElementById('quiz-box').style.display = 'none';
+
+                alert("BŁĄD! POWRÓT NA START!");
+
+            } else {
+
+                alert("NIEPOPRAWNIE! SPRÓBUJ JESZCZE RAZ.");
+
+            }
+
+        }
+
+    }
+
+
+
+    function endBattle() {
+
+        isPlaying = false;
+
+        beep(523, 0.1); beep(659, 0.1); beep(783, 0.3);
+
+        for(let i=0; i<150; i++) {
+
+            particles.push({
+
+                x: Math.random()*400, y: Math.random()*-400,
+
+                v: 2 + Math.random()*3, c: `hsl(${Math.random()*360}, 100%, 50%)`
+
+            });
+
+        }
+
+        setTimeout(() => {
+
+            alert("GRATULACJE! ZOSTAŁEŚ EKSPERTEM GORZOWA!");
+
+            location.reload();
+
+        }, 4000);
+
+    }
+
+
+
+    function beep(freq, dur) {
+
+        try {
+
+            let v = new (window.AudioContext || window.webkitAudioContext)();
+
+            let o = v.createOscillator(); let g = v.createGain();
+
+            o.type = "square"; o.frequency.value = freq;
+
+            o.connect(g); g.connect(v.destination);
+
+            o.start(); g.gain.exponentialRampToValueAtTime(0.00001, v.currentTime + dur);
+
+            o.stop(v.currentTime + dur);
+
+        } catch(e) {}
+
+    }
+
+
+
+    function gameLoop() { draw(); requestAnimationFrame(gameLoop); }
+
+
+
+    window.addEventListener('keydown', e => {
+
+        if(e.key === "ArrowUp") move(0,-1); if(e.key === "ArrowDown") move(0,1);
+
+        if(e.key === "ArrowLeft") move(-1,0); if(e.key === "ArrowRight") move(1,0);
+
+    });
+
+</script>
+
+</body>
+
+</html>
